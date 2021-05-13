@@ -1,26 +1,17 @@
 #-*- codeing = utf-8 -*-
-#@Time : 2020/3/3 17:51
-#@Author : 李巍
+#@Time : 2021年5月13日
+#@Author : ss
 #@File : spider.py
-#@Software: PyCharm
+#@Software: vscode
 
 from bs4 import BeautifulSoup     #网页解析，获取数据
 import re       #正则表达式，进行文字匹配
 import urllib.request,urllib.error      #制定URL，获取网页数据
 import csv
 import lxml
+#import requests
 
-
-
-def main():
-    baseurl = "https://movie.douban.com/top250?start="
-    #1.爬取网页
-    datalist = getData(baseurl)
-    savepath = "豆瓣电影Top250.csv"
-    #3.保存数据
-    saveData(datalist,savepath)
-
-
+#一级页面爬取使用的规则
 
 #影片详情链接的规则
 findLink = re.compile(r'<a href="(.*?)">')  
@@ -39,7 +30,7 @@ findBd = re.compile(r'<p class="">(.*?)</p>',re.S)
 
 
 
-#爬取一级页面：top250的10页
+#爬取一级页面：top250的5页
 def getData(baseurl):
     datalist = []
     #250条信息，共10页，每页25条，由于访问次数过多会被豆瓣禁用，此处只爬5页
@@ -120,8 +111,6 @@ def getData_detail(link):
     for i in range(0,len(platform)):
         video_link[platform[i].strip()] = platform_link[i].strip()
     video_link = str(video_link).replace('{',"").replace("}","")
-    #video_link = str(video_link).replace('{',"").replace("}","").replace(',',"\n")
-    #print(str(video_link))
 
     data_detail_list.append(video_link)
 
@@ -134,17 +123,13 @@ def getData_detail(link):
     intro_text = intro.xpath('//span[last()-1]/text()') #含<br>、空格
     if(len(intro_text)==0):
         intro_text = intro.xpath('//span/text()') #含<br>、空格
-    #intro_text = re.sub('<br>', "", intro_text[0]) 
     intro_text = intro_text[0]
     intro_text = intro_text.replace("<br>","")
     intro_text = intro_text.replace(" ","")
     intro_text = intro_text.replace("\n","")
     data_detail_list.append(intro_text)
 
-    #print(intro_text)
-
     #部分获奖信息
-    #award = soup.find_all("div",class_="award")
     award_name = soup_etree.xpath('//*[@id="content"]/div[3]/div[1]/div[8]/ul/li[1]//text()')
     award_type = soup_etree.xpath('//*[@id="content"]/div[3]/div[1]/div[8]/ul/li[2]//text()')
     award_actor_li = soup_etree.xpath('//*[@id="content"]/div[3]/div[1]/div[8]/ul/li[3]')
@@ -162,11 +147,8 @@ def getData_detail(link):
     
     award = ""
     for i in range(0, len(award_type)):
-        #print(lxml.etree.tostring(award_actor_li[i]))
         award_actor = lxml.etree.tostring(award_actor_li[i],encoding='utf-8').decode('utf-8')
-        #print(award_actor)
         award_actor = re.findall(r'<li><a href=".*" target="_blank">(.*?)</a></li>', award_actor)
-        #print(award_actor)
         if(len(award_actor)!=0):
             award = award + award_name[i] + "/" + award_type[i] + "/" + award_actor[0] + "\n"
         else:
@@ -183,15 +165,11 @@ def getData_detail(link):
     findRecommend = re.compile(r'<a.*?>(.*?)</a>')
     recommend = re.findall(findRecommend, recommend) #list
     recommend = "；".join(recommend)
-    # recommend = str(recommend).replace('[', "").replace(']', "")
     data_detail_list.append(recommend)
-    #print(recommend)
 
     return data_detail_list
 
-
-
-#得到指定一个URL的网页内容
+#得到指定一个URL的HTML
 def askURL(url):
     head = {                #模拟浏览器头部信息，向豆瓣服务器发送消息
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
@@ -207,11 +185,9 @@ def askURL(url):
             print(e.code)
         if hasattr(e,"reason"):
             print(e.reason)
-        #askURL(url) #防止爬取不到
     return html
 
-
-#保存数据
+#保存数据到csv
 def saveData(datalist,savepath):
     print("save....")
     
@@ -230,11 +206,63 @@ def saveData(datalist,savepath):
 
     f.close()
 
+#cookie登录豆瓣：可登录，但表单提交后显示404
+def login_comment(me_url):
+    head = {                #模拟浏览器头部信息，向豆瓣服务器发送消息
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+        "Cookie": 'bid=44vkjbqwTgg; douban-fav-remind=1; __yadk_uid=a2C9M4rJQuXwTHarssEXvwhBLtcSBGRO; ll="108296"; __utmc=30149280; push_noty_num=0; push_doumail_num=0; __utmv=30149280.20128; __utmz=30149280.1620739027.6.4.utmcsr=accounts.douban.com|utmccn=(referral)|utmcmd=referral|utmcct=/; ap_v=0,6.0; __utma=30149280.307091999.1598371029.1620885873.1620896210.15; _pk_ref.100001.8cb4=%5B%22%22%2C%22%22%2C1620898640%2C%22https%3A%2F%2Fmovie.douban.com%2Ftop250%3Fstart%22%5D; _pk_ses.100001.8cb4=*; __utmt=1; dbcl2="201282544:mZ1re7wfgXE"; ck=u_qM; __gads=ID=e058efa6f9a86e1e:T=1610684366:R:S=ALNI_Ma25FtKOnTgJIYhRBhqcg5Qe1X9ng; _pk_id.100001.8cb4=6e09a04369788aa2.1598371028.6.1620899043.1620739820.; __utmb=30149280.14.10.1620896210',
+        "Host": "www.douban.com",
+        "Origin": "https://www.douban.com",
+        "Referer": "https://www.douban.com/people/201282544/",
+        "sec-ch-ua": '" Not A;Brand";v="99", "Chromium";v="90", "Google Chrome";v="90"',
+        "sec-ch-ua-mobile": '?0',
+        "Sec-Fetch-Dest": 'document',
+        "Sec-Fetch-Mode": 'navigate',
+        "Sec-Fetch-Site": 'same-origin',
+        "Sec-Fetch-User": '?1',
+        "Upgrade-Insecure-Requests": '1',
+        "Accept": 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Cache-Control": "max-age=0",
+        "Connection": "keep-alive",
+        "Content-Length": "65",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    comment_data = {
+        "ck": "u_qM",
+        "bp_text": "爬虫时直接post表单实现留言",
+        "bp_submit":  "留言" 
+    }
+    comment_data = bytes(urllib.parse.urlencode(comment_data),encoding = 'utf-8')
+
+    request = urllib.request.Request(me_url,headers=head)
+    #request = urllib.request.Request(me_url,headers=head)
+    html = ""
+    try:
+        response = urllib.request.urlopen(request,data=comment_data)
+        html = requests.post(me_url,headers=head,data = comment_data)
+    except Exception as e:
+        if hasattr(e,"code"):
+            print(e.code)
+        if hasattr(e,"reason"):
+            print(e.reason)
+    print(html)
 
 
+def main():
+    baseurl = "https://movie.douban.com/top250?start="
+    #爬取两级网页
+    datalist = getData(baseurl)
+    savepath = "豆瓣电影Top250.csv"
+    #保存数据
+    saveData(datalist,savepath)
+    # me_url = 'https://www.douban.com/people/201282544/'
+    # login_comment(me_url)
+    # print("留言完毕！")
 
-
-if __name__ == "__main__":          #当程序执行时
+if __name__ == "__main__": 
 #调用函数
     main()
     print("爬取完毕！")
